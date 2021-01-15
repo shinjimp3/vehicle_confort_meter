@@ -9,32 +9,8 @@ float accX = 0.0F;
 float accY = 0.0F;
 float accZ = 0.0F;
 
-//Timerに関して 参考：https://lang-ship.com/blog/work/esp32-timer/
-hw_timer_t * timer = NULL;
-
-void IRAM_ATTR onTimer() {
-  
-  M5.IMU.getAccelData(&accX,&accY,&accZ);
-  //M5.Lcd.fillScreen(BLACK);    
-
-  //Gを表す矢印の描画
-  //draw_acc_arrow(accX,accY,accZ);
-
-  //快適度(不快度)の計算
-  //float confort_degree = calc_confort_degree(accX,accY,accZ);
-
-  //不快度を表す表情の描画
-  //draw_confort_face(confort_degree);
-
-}
-
 void setup() {
-
-  timer = timerBegin(1, 80, true);
-  timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 1000000, true);
-  timerAlarmEnable(timer);
-  
+ 
   M5.begin();
   //  serial for debugging
   Serial.begin(115200);
@@ -44,6 +20,20 @@ void setup() {
 }
 
 void loop() {
+  M5.IMU.getAccelData(&accX,&accY,&accZ);
+  
+  M5.Lcd.fillScreen(BLACK);    
+
+  //Gを表す矢印の描画
+  draw_acc_arrow(accX,accY,accZ);
+
+  //快適度(不快度)の計算
+  //float confort_degree = calc_confort_degree(accX,accY,accZ);
+
+  //不快度を表す表情の描画
+  //draw_confort_face(confort_degree);
+  
+  delay(20); //約50Hz
 
 }
 
