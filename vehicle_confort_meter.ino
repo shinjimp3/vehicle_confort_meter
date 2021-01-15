@@ -9,6 +9,10 @@ float accX = 0.0F;
 float accY = 0.0F;
 float accZ = 0.0F;
 
+//ループ一回分の処理時間を取得するためのタイマー
+unsigned int process_time = 0; //[ms]
+unsigned int start_time = millis();
+
 void setup() {
  
   M5.begin();
@@ -20,6 +24,9 @@ void setup() {
 }
 
 void loop() {
+  start_time = millis();
+  float process_timef = (float)process_time/1000; 
+  
   M5.IMU.getAccelData(&accX,&accY,&accZ);
   
   M5.Lcd.fillScreen(BLACK);    
@@ -32,8 +39,12 @@ void loop() {
 
   //不快度を表す表情の描画
   //draw_confort_face(confort_degree);
+  process_time = millis() - start_time; //[ms]
   
-  delay(20); //約50Hz
+  delay(100-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
+  Serial.print(start_time);
+  Serial.print(' ');
+  Serial.println(process_time);
 
 }
 
