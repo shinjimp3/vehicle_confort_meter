@@ -1,54 +1,36 @@
+// define must ahead #include <M5Stack.h>
+#define M5STACK_MPU6886
 #include <M5Stack.h>
-#include "utility/MPU9250.h"
+//#include "utility/MPU9250.h"
 #define SCR_W 320
 #define SCR_H 240
 
-MPU9250 IMU;
+float accX = 0.0F;
+float accY = 0.0F;
+float accZ = 0.0F;
 
 //Timerに関して 参考：https://lang-ship.com/blog/work/esp32-timer/
 hw_timer_t * timer = NULL;
 
 void IRAM_ATTR onTimer() {
   
-  //デバッグ用
-  Serial.println("Hello!");
-    
-  /*if (IMU.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
-  {  
-    IMU.readAccelData(IMU.accelCount);  // Read the x/y/z adc values
-    IMU.getAres();
+  M5.IMU.getAccelData(&accX,&accY,&accZ);
+  //M5.Lcd.fillScreen(BLACK);    
 
-    // Now we'll calculate the accleration value into actual g's
-    // This depends on scale being set
-    IMU.ax = (float)IMU.accelCount[0]*IMU.aRes; // - accelBias[0];
-    IMU.ay = (float)IMU.accelCount[1]*IMU.aRes; // - accelBias[1];
-    IMU.az = (float)IMU.accelCount[2]*IMU.aRes; // - accelBias[2];
+  //Gを表す矢印の描画
+  //draw_acc_arrow(accX,accY,accZ);
 
-    //デバッグ用
-    Serial.print(IMU.ax);
-    Serial.print(' ');
-    Serial.print(IMU.ay);
-    Serial.print(' ');
-    Serial.println(IMU.az);
+  //快適度(不快度)の計算
+  //float confort_degree = calc_confort_degree(accX,accY,accZ);
 
-    //M5.Lcd.fillScreen(BLACK);    
+  //不快度を表す表情の描画
+  //draw_confort_face(confort_degree);
 
-    //Gを表す矢印の描画
-    //draw_acc_arrow(IMU.ax, IMU.ay, IMU.az);
-
-    //快適度(不快度)の計算
-    //float confort_degree = calc_confort_degree(IMU.ax, IMU.ay, IMU.az);
-
-    //不快度を表す表情の描画
-    //draw_confort_face(confort_degree);
-
-  }*/
 }
 
 void setup() {
-  Serial.begin(115200);
 
-  timer = timerBegin(0, 80, true);
+  timer = timerBegin(1, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 1000000, true);
   timerAlarmEnable(timer);
@@ -56,9 +38,8 @@ void setup() {
   M5.begin();
   //  serial for debugging
   Serial.begin(115200);
-  //  i2c as a master
-  Wire.begin();
-  IMU.initMPU9250();
+
+  M5.IMU.Init();
 
 }
 
