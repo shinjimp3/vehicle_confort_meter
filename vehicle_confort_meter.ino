@@ -8,6 +8,7 @@
 float accX = 0.0F;
 float accY = 0.0F;
 float accZ = 0.0F;
+float confort_degree = 0.0F;
 
 //ループ一回分の処理時間を取得するためのタイマー
 unsigned int process_time = 0; //[ms]
@@ -27,23 +28,23 @@ void loop() {
   start_time = millis();
   float process_timef = (float)process_time/1000; 
   
-  M5.IMU.getAccelData(&accX,&accY,&accZ);
-  
-  M5.Lcd.fillScreen(BLACK);    
-
-  //Gを表す矢印の描画
-  draw_acc_arrow(accX,accY,accZ);
-
+  //加速度取得および快適度(不快度)計算 50Hz
+  M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
   //快適度(不快度)の計算
-  //float confort_degree = calc_confort_degree(accX,accY,accZ);
-
+  confort_degree = calc_confort_degree(accX,accY,accZ);
+  
+  //描画 10Hz
+  M5.Lcd.fillScreen(BLACK); //33ms
+  //Gを表す矢印の描画
+  draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
   //不快度を表す表情の描画
-  //draw_confort_face(confort_degree);
+  draw_confort_face(confort_degree);
+
   process_time = millis() - start_time; //[ms]
   
-  delay(100-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
-  Serial.print(start_time);
-  Serial.print(' ');
+  if(100-process_time >= 0){
+    delay(100-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+  }
   Serial.println(process_time);
 
 }
