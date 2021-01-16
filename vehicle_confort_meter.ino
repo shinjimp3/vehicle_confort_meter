@@ -70,16 +70,25 @@ void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
   float ar_al = 0.75; //矢印軸の長さ
   float ar_tw = 0.5; //三角部の幅
   float ar_tl = 1.0-ar_al; //三角部の長さ(軸と合わせ全体で1.0になるように)
+  float g_std_size = 0.1; //[G]
   //オリジナル矢印の形を決める，矢印の頂点座標
   float arrow_ox[7] = {-ar_aw/2, -ar_aw/2, ar_aw/2, ar_aw/2, -ar_tw/2, ar_tw/2, 0};
   float arrow_oy[7] = {0, ar_al, ar_al, 0, ar_al, ar_al, 1.0};
   float arrow_rx[7], arrow_ry[7], arrow_hx[7], arrow_hy[7];
   int arrow_px[7], arrow_py[7];
 
-  //オリジナル矢印画像をピクセル座標に変換(画面中心から画面下に伸びるよう配置)
+  //オリジナル矢印画像(→x,↓y, 矢印の根本が(0,0)，先端が(0,1))
+  //→加速度に応じて回転＆拡大縮小(→x方向に-accX，↓y方向に-accZ)
+  //→ホモグラフィ変換で，奥行きのある台形にする()
+  //→ピクセル座標に変換(例：中心座標[0,0]を[160, 120]に持っていく)
   for(int i=0; i<sizeof(arrow_ox)/sizeof(arrow_ox[0]); i++){
-      arrow_px[i] = (int)(arrow_ox[i]*SCR_H/2 + SCR_W/2);
-      arrow_py[i] = (int)(arrow_oy[i]*SCR_H/2 + SCR_H/2);
+    //回転＆拡大縮小
+      float theta = atan2(-accZ, -accX) - 3.1415926535/2;
+      float scale = sqrt(accZ*accZ + accX*accX) / g_std_size;
+      arrow_rx[i] = scale*(cos(theta)*arrow_ox[i] - sin(theta)*arrow_oy[i]);
+      arrow_ry[i] = scale*(sin(theta)*arrow_ox[i] + cos(theta)*arrow_oy[i]);
+      arrow_px[i] = (int)(arrow_rx[i]*SCR_H/2 + SCR_W/2);
+      arrow_py[i] = (int)(arrow_ry[i]*SCR_H/2 + SCR_H/2);
   }
 
   //3角形の塊で矢印を描く
