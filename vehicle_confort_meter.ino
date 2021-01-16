@@ -6,7 +6,11 @@
 #define SCR_H 240
 
 float accX, accY, accZ;
-float confort_degree = 0.0F;
+float pre_accX = 0.0;
+float pre_accY = 0.0;
+float pre_accZ = 0.0;
+float confort_degree = 0.0;
+float cutoff_pref = 8.0; //[Hz]
 
 //メインループ一回分の処理時間を取得するためのタイマー
 unsigned long loop_start_time = millis(); //to do 50日以上稼働してもオーバーフローの問題が起こらないようにする
@@ -26,12 +30,20 @@ void setup() {
 void loop() {
   //加速度取得および快適度(不快度)計算 50Hz(20ms)
   loop_start_time = millis();
-  int loop_cycle = 20;
+  int loop_cycle = 20; //[ms]
   
   //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
+  //カットオフ周波数8Hzの一時フィルタ
+  accX = first_orderd_filter(accX, pre_accX, cutoff_pref, (float)loop_cycle/1000);
+  accY = first_orderd_filter(accY, pre_accY, cutoff_pref, (float)loop_cycle/1000);
+  accZ = first_orderd_filter(accZ, pre_accZ, cutoff_pref, (float)loop_cycle/1000);
   //快適度(不快度)の計算
   confort_degree = calc_confort_degree(accX,accY,accZ);
+
+  pre_accX = accX;
+  pre_accY = accY;
+  pre_accZ = accZ;
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
   if(loop_cycle-process_time >= 0){
@@ -61,6 +73,12 @@ void drawing_task(void* arg){
     }
     Serial.println("drawing!");
   }
+}
+
+float first_orderd_filter(float x, float pre_x, float fc, float ts){
+  //後退差分で一次遅れフィルタの結果を返す
+  float tau = 1/(2*3.1415926535*fc); //時定数 
+  return tau/(ts+tau)*pre_x + ts/(ts+tau)*x;
 }
 
 void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
