@@ -5,48 +5,62 @@
 #define SCR_W 320
 #define SCR_H 240
 
-float accX = 0.0F;
-float accY = 0.0F;
-float accZ = 0.0F;
+float accX, accY, accZ;
 float confort_degree = 0.0F;
 
-//ループ一回分の処理時間を取得するためのタイマー
-unsigned int process_time = 0; //[ms]
-unsigned int start_time = millis();
+//メインループ一回分の処理時間を取得するためのタイマー
+unsigned long loop_start_time = millis(); //to do 50日以上稼働してもオーバーフローの問題が起こらないようにする
+//描画ループ一回分の処理時間を取得するためのタイマー
+unsigned long draw_start_time = millis(); //to do 50日以上稼働してもオーバーフローの問題が起こらないようにする
 
 void setup() {
  
   M5.begin();
-  //  serial for debugging
+  M5.Power.begin();
   Serial.begin(115200);
-
+  xTaskCreatePinnedToCore(drawing_task, "Draw", 4096, NULL, 1, NULL, 0);
   M5.IMU.Init();
 
 }
 
 void loop() {
-  start_time = millis();
-  float process_timef = (float)process_time/1000; 
+  //加速度取得および快適度(不快度)計算 50Hz(20ms)
+  loop_start_time = millis();
+  int loop_cycle = 20;
   
-  //加速度取得および快適度(不快度)計算 50Hz
+  //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
   //快適度(不快度)の計算
   confort_degree = calc_confort_degree(accX,accY,accZ);
-  
-  //描画 10Hz
-  M5.Lcd.fillScreen(BLACK); //33ms
-  //Gを表す矢印の描画
-  draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
-  //不快度を表す表情の描画
-  draw_confort_face(confort_degree);
 
-  process_time = millis() - start_time; //[ms]
-  
-  if(100-process_time >= 0){
-    delay(100-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+  unsigned long process_time = millis() - loop_start_time; //[ms]  
+  if(loop_cycle-process_time >= 0){
+    delay(loop_cycle-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
   }
-  Serial.println(process_time);
+  Serial.print(accZ);
+  Serial.print(' ');
+  Serial.println(-accX);
 
+}
+
+void drawing_task(void* arg){
+  while(1){
+    //描画 10Hz(100ms)
+    draw_start_time = millis();
+    int loop_cycle = 100;
+
+    M5.Lcd.fillScreen(BLACK); //33ms
+    //Gを表す矢印の描画
+    draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
+    //不快度を表す表情の描画
+    draw_confort_face(confort_degree);
+
+    unsigned long process_time = millis() - draw_start_time; //[ms]
+    if(loop_cycle-process_time >= 0){
+      delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+    }
+    Serial.println("drawing!");
+  }
 }
 
 void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
