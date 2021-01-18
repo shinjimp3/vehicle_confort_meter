@@ -8,8 +8,9 @@
 float accX, accY, accZ;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
-//todo:シフト処理が軽くなるように線形リストにする
-float accX_buf[150], accY_buf[150], accZ_buf[150]; //とりあえず50Hzで3秒分
+int buf_length = 150;
+float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length]; //とりあえず50Hzで3秒分
+int buf_top = 0;
 
 //メインループ一回分の処理時間を取得するためのタイマー
 unsigned long loop_start_time = millis(); //to do 50日以上稼働してもオーバーフローの問題が起こらないようにする
@@ -33,7 +34,7 @@ void loop() {
   
   //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
-  update_acc_buff(accX, accY, accZ);
+  update_acc_buf(accX, accY, accZ);
 
   //カットオフ周波数8Hzの一時フィルタ
   accX = first_orderd_filter(accX, accX_buf[1], cutoff_pref, (float)loop_cycle/1000);
@@ -48,6 +49,15 @@ void loop() {
     delay(loop_cycle-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
   }
 
+}
+
+void update_acc_buf(float accX, float accY, float accZ){
+  accX_buf[buf_top] = accX;
+  accY_buf[buf_top] = accY;
+  accZ_buf[buf_top] = accZ;
+
+  buf_top++;
+  buf_top = buf_top%buf_length;
 }
 
 void drawing_task(void* arg){
