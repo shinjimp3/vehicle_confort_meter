@@ -6,11 +6,10 @@
 #define SCR_H 240
 
 float accX, accY, accZ;
-float pre_accX = 0.0;
-float pre_accY = 0.0;
-float pre_accZ = 0.0;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
+//todo:シフト処理が軽くなるように線形リストにする
+float accX_buf[150], accY_buf[150], accZ_buf[150]; //とりあえず50Hzで3秒分
 
 //メインループ一回分の処理時間を取得するためのタイマー
 unsigned long loop_start_time = millis(); //to do 50日以上稼働してもオーバーフローの問題が起こらないようにする
@@ -34,24 +33,20 @@ void loop() {
   
   //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
+  update_acc_buff(accX, accY, accZ);
+
   //カットオフ周波数8Hzの一時フィルタ
-  accX = first_orderd_filter(accX, pre_accX, cutoff_pref, (float)loop_cycle/1000);
-  accY = first_orderd_filter(accY, pre_accY, cutoff_pref, (float)loop_cycle/1000);
-  accZ = first_orderd_filter(accZ, pre_accZ, cutoff_pref, (float)loop_cycle/1000);
+  accX = first_orderd_filter(accX, accX_buf[1], cutoff_pref, (float)loop_cycle/1000);
+  accY = first_orderd_filter(accY, accY_buf[1], cutoff_pref, (float)loop_cycle/1000);
+  accZ = first_orderd_filter(accZ, accZ_buf[1], cutoff_pref, (float)loop_cycle/1000);
   //快適度(不快度)の計算
   confort_degree = calc_confort_degree(accX,accY,accZ);
 
-  pre_accX = accX;
-  pre_accY = accY;
-  pre_accZ = accZ;
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
   if(loop_cycle-process_time >= 0){
     delay(loop_cycle-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
   }
-  Serial.print(accZ);
-  Serial.print(' ');
-  Serial.println(-accX);
 
 }
 
