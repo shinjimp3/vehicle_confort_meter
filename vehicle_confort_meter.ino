@@ -6,10 +6,12 @@
 #define SCR_H 240
 
 float accX, accY, accZ;
+float jerkX, jerkY, jerkZ;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
-int buf_length = 150;
-float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length]; //とりあえず50Hzで3秒分
+const int buf_length = 300; //100Hzで3秒分
+float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length];
+float jerkX_buf[buf_length], jerkY_buf[buf_length], jerkZ_buf[buf_length];
 int buf_top = 0;
 
 //メインループ一回分の処理時間を取得するためのタイマー
@@ -28,33 +30,47 @@ void setup() {
 }
 
 void loop() {
-  //加速度取得および快適度(不快度)計算 50Hz(20ms)
+  //加速度取得および快適度(不快度)計算 100Hz(10ms)
   loop_start_time = millis();
-  int loop_cycle = 20; //[ms]
+  int loop_cycle = 10; //[ms]
   
   //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
-  update_acc_buf(accX, accY, accZ);
-
   //カットオフ周波数8Hzの一時フィルタ
-  accX = first_orderd_filter(accX, accX_buf[1], cutoff_pref, (float)loop_cycle/1000);
-  accY = first_orderd_filter(accY, accY_buf[1], cutoff_pref, (float)loop_cycle/1000);
-  accZ = first_orderd_filter(accZ, accZ_buf[1], cutoff_pref, (float)loop_cycle/1000);
+  accX = first_orderd_filter(accX, accX_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
+  accY = first_orderd_filter(accY, accY_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
+  accZ = first_orderd_filter(accZ, accZ_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
+  update_acc_jerk_buf(accX, accY, accZ);
+
   //快適度(不快度)の計算
   confort_degree = calc_confort_degree(accX,accY,accZ);
 
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
   if(loop_cycle-process_time >= 0){
-    delay(loop_cycle-process_time); //処理時間を差し引いて，20ms(50Hz)置きにloopを動作させる
+    delay(loop_cycle-process_time); //処理時間を差し引いて，10ms(100Hz)置きにloopを動作させる
   }
 
 }
 
-void update_acc_buf(float accX, float accY, float accZ){
+void update_acc_jerk_buf(float accX, float accY, float accZ){
   accX_buf[buf_top] = accX;
   accY_buf[buf_top] = accY;
   accZ_buf[buf_top] = accZ;
+
+  //jerk取得
+  jerkX = calc_jerk(accX_buf);
+  jerkY = calc_jerk(accY_buf);
+  jerkZ = calc_jerk(accZ_buf);
+
+  jerkX_buf[buf_top] = jerkX;
+  jerkY_buf[buf_top] = jerkY;
+  jerkZ_buf[buf_top] = jerkZ;
+
+//  for debug
+  Serial.print(accX_buf[buf_top]);
+  Serial.print(",");
+  Serial.println(jerkX_buf[buf_top]);
 
   buf_top++;
   buf_top = buf_top%buf_length;
@@ -68,7 +84,9 @@ void drawing_task(void* arg){
 
     M5.Lcd.fillScreen(BLACK); //33ms
     //Gを表す矢印の描画
-    draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
+    //draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
+    //Test すぐ消す jerkを表示
+    draw_acc_arrow(jerkX, jerkY, jerkZ);
     //不快度を表す表情の描画
     draw_confort_face(confort_degree);
 
@@ -76,7 +94,6 @@ void drawing_task(void* arg){
     if(loop_cycle-process_time >= 0){
       delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
     }
-    Serial.println("drawing!");
   }
 }
 
@@ -125,6 +142,20 @@ void draw_confort_face(float confort_degree){
 }
 
 float calc_confort_degree(float acc_x, float acc_y, float acc_z){
-    // 快適度(不快度)を加速度に基づいて算出する
+  // 快適度(不快度)を加速度に基づいて算出する
     return 1.0;
+}
+
+float calc_jerk(float* acc_buf){
+  //加速度の変化を二次式で近似することによる，ノイズに強いjerk計算
+  //参考：https://www.jstage.jst.go.jp/article/jje1965/36/4/36_4_191/_pdf/-char/ja
+  
+  //BLA::Matrix<3,3> A;
+  //BLA::Matrix<3,1> b;
+
+  //をやる前にまずは単純な微分値で実装
+  //1ステップだとノイズの影響が大きいので，
+  //100ms(10サンプル)(10Hz)間の変化量でjerkを計算し，平均化する
+  float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length]); //[delta G]
+  return jerk;
 }
