@@ -43,13 +43,14 @@ void loop() {
   update_acc_jerk_buf(accX, accY, accZ);
 
   //快適度(不快度)の計算
-  confort_degree = calc_disconfort_degree(accX,accY,accZ);
-
+  confort_degree = calc_disconfort_degree();
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
   if(loop_cycle-process_time >= 0){
     delay(loop_cycle-process_time); //処理時間を差し引いて，10ms(100Hz)置きにloopを動作させる
   }
+
+  Serial.println(process_time); //100Hzで処理できているか確認
 
 }
 
@@ -67,10 +68,10 @@ void update_acc_jerk_buf(float accX, float accY, float accZ){
   jerkY_buf[buf_top] = jerkY;
   jerkZ_buf[buf_top] = jerkZ;
 
-//  for debug
-  Serial.print(accX_buf[buf_top]);
+  //debug
+  /*Serial.print(accX_buf[buf_top]);
   Serial.print(",");
-  Serial.println(jerkX_buf[buf_top]);
+  Serial.println(jerkX_buf[buf_top]);*/
 
   buf_top++;
   buf_top = buf_top%buf_length;
@@ -84,9 +85,7 @@ void drawing_task(void* arg){
 
     M5.Lcd.fillScreen(BLACK); //33ms
     //Gを表す矢印の描画
-    //draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
-    //Test すぐ消す jerkを表示
-    draw_acc_arrow(jerkX, jerkY, jerkZ);
+    draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
     //不快度を表す表情の描画
     draw_confort_face(confort_degree);
 
@@ -139,11 +138,32 @@ void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
 
 void draw_confort_face(float confort_degree){
     // 快適度(不快度)に応じて表情を描画する
+    M5.Lcd.setCursor(10,10);
+    if(confort_degree<1.0){
+      M5.Lcd.print("Great!");
+      return;
+    }
+    if(confort_degree<2.0){
+      M5.Lcd.print("Good.");
+      return;
+    }
+    if(confort_degree<3.0){
+      M5.Lcd.print("Bad...");
+      return;
+    }
+    M5.Lcd.print("Terrible!!");
+    return;
 }
 
-float calc_disconfort_degree(float acc_x, float acc_y, float acc_z){
+float calc_disconfort_degree(){
   // 快適度(不快度)を加速度に基づいて算出する
-    return 1.0;
+  float jerk_sq_sum = 0.0;
+  for(int i; i<buf_length; i++){
+    jerk_sq_sum += jerkX_buf[i]*jerkX_buf[i] + jerkZ_buf[i]*jerkZ_buf[i];
+  }
+  //jerkの大きさの2乗平均を不快度の指標として用いる
+  float disconfort_degree = 0.025*jerk_sq_sum/buf_length;
+  return disconfort_degree;
 }
 
 float calc_jerk(float* acc_buf){
@@ -156,6 +176,6 @@ float calc_jerk(float* acc_buf){
   //をやる前にまずは単純な微分値で実装
   //1ステップだとノイズの影響が大きいので，
   //100ms(10サンプル)(10Hz)間の変化量でjerkを計算し，平均化する
-  float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length]); //[delta G]
+  float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length])*9.8/0.1; //[G]→[m/s^3]
   return jerk;
 }
