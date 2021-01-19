@@ -43,7 +43,7 @@ void loop() {
   update_acc_jerk_buf(accX, accY, accZ);
 
   //快適度(不快度)の計算
-  confort_degree = calc_confort_degree(accX,accY,accZ);
+  confort_degree = calc_disconfort_degree(accX,accY,accZ);
 
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
@@ -141,7 +141,7 @@ void draw_confort_face(float confort_degree){
     // 快適度(不快度)に応じて表情を描画する
 }
 
-float calc_confort_degree(float acc_x, float acc_y, float acc_z){
+float calc_disconfort_degree(float acc_x, float acc_y, float acc_z){
   // 快適度(不快度)を加速度に基づいて算出する
     return 1.0;
 }
