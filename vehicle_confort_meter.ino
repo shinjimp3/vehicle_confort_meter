@@ -10,7 +10,7 @@ float jerkX, jerkY, jerkZ;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
 const int buf_length = 300; //100Hzで3秒分
-float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length];
+float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length]; //todo: バッファに頼らない処理にする
 float jerkX_buf[buf_length], jerkY_buf[buf_length], jerkZ_buf[buf_length];
 int buf_top = 0;
 
@@ -50,8 +50,6 @@ void loop() {
     delay(loop_cycle-process_time); //処理時間を差し引いて，10ms(100Hz)置きにloopを動作させる
   }
 
-  Serial.println(process_time); //100Hzで処理できているか確認
-
 }
 
 void update_acc_jerk_buf(float accX, float accY, float accZ){
@@ -69,9 +67,13 @@ void update_acc_jerk_buf(float accX, float accY, float accZ){
   jerkZ_buf[buf_top] = jerkZ;
 
   //debug
-  /*Serial.print(accX_buf[buf_top]);
+  Serial.print(accX_buf[buf_top]);
   Serial.print(",");
-  Serial.println(jerkX_buf[buf_top]);*/
+  Serial.print(accZ_buf[buf_top]);
+  Serial.print(",");
+  Serial.print(jerkX_buf[buf_top]);
+  Serial.print(",");
+  Serial.print(jerkZ_buf[buf_top]);
 
   buf_top++;
   buf_top = buf_top%buf_length;
@@ -157,12 +159,16 @@ void draw_confort_face(float confort_degree){
 
 float calc_disconfort_degree(){
   // 快適度(不快度)を加速度に基づいて算出する
-  float jerk_sq_sum = 0.0;
+  float jerk_sq_mean = 0.0;
   for(int i; i<buf_length; i++){
-    jerk_sq_sum += jerkX_buf[i]*jerkX_buf[i] + jerkZ_buf[i]*jerkZ_buf[i];
+    jerk_sq_mean += (jerkX_buf[i]*jerkX_buf[i] + jerkZ_buf[i]*jerkZ_buf[i])/(float)buf_length;
   }
+  Serial.print(",");
+  Serial.print(jerk_sq_mean);
   //jerkの大きさの2乗平均を不快度の指標として用いる
-  float disconfort_degree = 0.025*jerk_sq_sum/buf_length;
+  float disconfort_degree = 0.0004*jerk_sq_mean; //係数は要調節
+  Serial.print(",");
+  Serial.println(disconfort_degree);
   return disconfort_degree;
 }
 
