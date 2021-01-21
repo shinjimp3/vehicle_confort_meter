@@ -159,18 +159,46 @@ void draw_confort_face(float confort_degree){
     // 快適度(不快度)に応じて表情を描画する
     M5.Lcd.setCursor(10,10);
     if(confort_degree<1.0){
-      M5.Lcd.print("Great!");
+      M5.Lcd.fillCircle(160,60,50,YELLOW); //face
+      M5.Lcd.drawCircle(160-20,60,10,BLACK); //eye
+      M5.Lcd.drawCircle(160+20,60,10,BLACK); //eye
+      M5.Lcd.fillCircle(160,60+25,20,RED); //mouse
+      M5.Lcd.fillRect(160-25-10,60,70,25,YELLOW); //face
       return;
     }
     if(confort_degree<2.0){
-      M5.Lcd.print("Good.");
+      M5.Lcd.fillCircle(160,60,50,YELLOW); //face
+      M5.Lcd.fillRect(160-20-3,60-9,6,18,BLACK); //eye
+      M5.Lcd.fillRect(160+20-3,60-9,6,18,BLACK); //eye
+      M5.Lcd.drawCircle(160,60+20,10,BLACK); //mouse
+      M5.Lcd.fillRect(160-10,60,22,25,YELLOW); //face
       return;
     }
     if(confort_degree<3.0){
-      M5.Lcd.print("Bad...");
+      M5.Lcd.fillCircle(160,60,50,CYAN); //face
+      M5.Lcd.fillCircle(160-20,60+1,15+1,WHITE); //pien eye
+      M5.Lcd.fillCircle(160-20,60,15,BLACK);
+      M5.Lcd.fillCircle(160-20-5,60-5,7,WHITE); //hilight
+      M5.Lcd.fillCircle(160-20+3,60+3,2,WHITE); //hilight
+      M5.Lcd.drawLine(160-40,60-15,160-20,60-25,BLACK); //eybllow
+      
+      M5.Lcd.fillCircle(160+20,60+1,15+1,WHITE); //pien eye
+      M5.Lcd.fillCircle(160+20,60,15,BLACK);
+      M5.Lcd.fillCircle(160+20-5,60-5,7,WHITE); //hilight
+      M5.Lcd.fillCircle(160+20+3,60+3,2,WHITE); //hilight
+      M5.Lcd.drawLine(160+40,60-15,160+20,60-25,BLACK); //eybllow
+      
+      M5.Lcd.drawLine(160-5,60+30,160,60+30-2,BLACK); //mouse
+      M5.Lcd.drawLine(160+5,60+30,160,60+30-2,BLACK); //mouse
       return;
     }
-    M5.Lcd.print("Terrible!!");
+    M5.Lcd.fillCircle(160,60,50,PURPLE); //face
+    M5.Lcd.drawLine(160-30,60-6,160-10,60,BLACK); //eye
+    M5.Lcd.drawLine(160-30,60+6,160-10,60,BLACK);
+    M5.Lcd.drawLine(160+30,60-6,160+10,60,BLACK); //eye
+    M5.Lcd.drawLine(160+30,60+6,160+10,60,BLACK);
+    M5.Lcd.fillRect(160-20,60+15,40,20,RED); //mouse
+    M5.Lcd.fillRect(160-20+3,60+15+10,40-6,30,GREEN); //gero
     return;
 }
 
@@ -183,7 +211,7 @@ float calc_disconfort_degree(){
   Serial.print(",");
   Serial.print(jerk_sq_mean);
   //jerkの大きさの2乗平均を不快度の指標として用いる
-  float disconfort_degree = 0.0004*jerk_sq_mean; //係数は要調節
+  float disconfort_degree = 0.0016*jerk_sq_mean; //係数は要調節
   Serial.print(",");
   Serial.println(disconfort_degree);
   return disconfort_degree;
