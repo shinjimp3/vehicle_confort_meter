@@ -7,6 +7,7 @@
 
 float accX, accY, accZ;
 float accX_bias, accY_bias, accZ_bias;
+bool is_calibrationing;
 float jerkX, jerkY, jerkZ;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
@@ -32,6 +33,10 @@ void setup() {
 }
 
 void loop() {
+  M5.update();
+  if(M5.BtnC.isPressed()){
+    calibration();
+  }
   //加速度取得および快適度(不快度)計算 100Hz(10ms)
   loop_start_time = millis();
   int loop_cycle = 10; //[ms]
@@ -86,19 +91,21 @@ void update_acc_jerk_buf(float accX, float accY, float accZ){
 
 void drawing_task(void* arg){
   while(1){
-    //描画 10Hz(100ms)
-    draw_start_time = millis();
-    int loop_cycle = 100;
+    if(!is_calibrationing){
+      //描画 10Hz(100ms)
+      draw_start_time = millis();
+      int loop_cycle = 100;
 
-    M5.Lcd.fillScreen(BLACK); //33ms
-    //Gを表す矢印の描画
-    draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
-    //不快度を表す表情の描画
-    draw_confort_face(confort_degree);
+      M5.Lcd.fillScreen(BLACK); //33ms
+      //Gを表す矢印の描画
+      draw_acc_arrow(accX,accY,accZ); //3ms M5.Lcd.fillTriangleが3つ
+      //不快度を表す表情の描画
+      draw_confort_face(confort_degree);
 
-    unsigned long process_time = millis() - draw_start_time; //[ms]
-    if(loop_cycle-process_time >= 0){
-      delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+      unsigned long process_time = millis() - draw_start_time; //[ms]
+      if(loop_cycle-process_time >= 0){
+        delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+      }
     }
   }
 }
@@ -199,6 +206,7 @@ float calc_jerk(float* acc_buf){
 void calibration(){
   //(ユーザーにはキャリブレーション中5秒動かないようにお願いする)
   //5秒程度平均を取って加速度のバイアスを計算する
+  is_calibrationing = true;
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextSize(2);//文字の大きさを設定（1(最小)～7(最大)）
   M5.Lcd.setCursor(20, 20); //文字表示の左上位置を設定
@@ -224,5 +232,5 @@ void calibration(){
   accX_bias /= 500;
   accY_bias /= 500;
   accZ_bias /= 500;
-  
+  is_calibrationing = false;  
 }
