@@ -6,6 +6,7 @@
 #define SCR_H 240
 
 float accX, accY, accZ;
+float accX_bias, accY_bias, accZ_bias;
 float jerkX, jerkY, jerkZ;
 float confort_degree = 0.0;
 float cutoff_pref = 8.0; //[Hz]
@@ -24,8 +25,9 @@ void setup() {
   M5.begin();
   M5.Power.begin();
   Serial.begin(115200);
-  xTaskCreatePinnedToCore(drawing_task, "Draw", 4096, NULL, 1, NULL, 0);
   M5.IMU.Init();
+  calibration();
+  xTaskCreatePinnedToCore(drawing_task, "Draw", 4096, NULL, 1, NULL, 0);
 
 }
 
@@ -36,6 +38,9 @@ void loop() {
   
   //加速度取得
   M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
+  accX -= accX_bias;
+  accY -= accY_bias;
+  accZ -= accZ_bias;
   //カットオフ周波数8Hzの一時フィルタ
   accX = first_orderd_filter(accX, accX_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
   accY = first_orderd_filter(accY, accY_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
@@ -189,4 +194,35 @@ float calc_jerk(float* acc_buf){
   //100ms(10サンプル)(10Hz)間の変化量でjerkを計算し，平均化する
   float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length])*9.8/0.1; //[G]→[m/s^3]
   return jerk;
+}
+
+void calibration(){
+  //(ユーザーにはキャリブレーション中5秒動かないようにお願いする)
+  //5秒程度平均を取って加速度のバイアスを計算する
+  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setTextSize(2);//文字の大きさを設定（1(最小)～7(最大)）
+  M5.Lcd.setCursor(20, 20); //文字表示の左上位置を設定
+  M5.Lcd.setTextColor(WHITE); //文字色を設定（文字背景色は透明）
+  M5.Lcd.println("Calibration now.\n\nPlease don't move me.");
+  delay(2000);
+
+  accX_bias = 0;
+  accY_bias = 0;
+  accZ_bias = 0;
+
+  for(int i=-2; i<3; i++){
+    for(int j=0; j<100; j++){
+      M5.IMU.getAccelData(&accX,&accY,&accZ); //0 ms
+      accX_bias += accX;
+      accY_bias += accY;
+      accZ_bias += accZ;
+      delay(10);
+    }
+    M5.Lcd.fillCircle((int)(SCR_W/2)+i*40,(int)(SCR_H/2),10,WHITE);
+  }
+  delay(500);
+  accX_bias /= 500;
+  accY_bias /= 500;
+  accZ_bias /= 500;
+  
 }
