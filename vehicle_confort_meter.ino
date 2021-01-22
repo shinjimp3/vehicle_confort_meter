@@ -1,4 +1,3 @@
-// define must ahead #include <M5Stack.h>
 #define M5STACK_MPU6886
 #include <M5Stack.h>
 //#include "utility/MPU9250.h"
@@ -9,9 +8,11 @@ float accX, accY, accZ;
 float accX_bias, accY_bias, accZ_bias;
 bool is_calibrationing;
 float jerkX, jerkY, jerkZ;
-float confort_degree = 0.0;
+float disconfort_degree = 0.0;
 float cutoff_pref = 4.0; //[Hz]
 const int buf_length = 300; //100Hzで3秒分
+//x,y,z各方向の加速度とジャークを保存するバッファ。循環バッファとして扱う
+//buf_topは最新データの入ったインデックスを表す
 float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length]; //todo: バッファに頼らない処理にする
 float jerkX_buf[buf_length], jerkY_buf[buf_length], jerkZ_buf[buf_length];
 int buf_top = 0;
@@ -34,10 +35,11 @@ void setup() {
 
 void loop() {
   M5.update();
+  //Cボタン押下でキャリブレーション
   if(M5.BtnC.isPressed()){
     calibration();
   }
-  //加速度取得および快適度(不快度)計算 100Hz(10ms)
+  //加速度取得および不快度計算を本loop()内において100Hz(10ms)で行う
   loop_start_time = millis();
   int loop_cycle = 10; //[ms]
   
@@ -46,14 +48,14 @@ void loop() {
   accX -= accX_bias;
   accY -= accY_bias;
   accZ -= accZ_bias;
-  //カットオフ周波数8Hzの一時フィルタ
+  //カットオフ周波数cutoff_pref=4.0Hzの一次フィルタ
   accX = first_orderd_filter(accX, accX_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
   accY = first_orderd_filter(accY, accY_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
   accZ = first_orderd_filter(accZ, accZ_buf[(buf_top+buf_length-1)%buf_length], cutoff_pref, (float)loop_cycle/1000);
   update_acc_jerk_buf(accX, accY, accZ);
 
   //快適度(不快度)の計算
-  confort_degree = calc_disconfort_degree();
+  disconfort_degree = calc_disconfort_degree();
 
   unsigned long process_time = millis() - loop_start_time; //[ms]  
   if(loop_cycle-process_time >= 0){
@@ -63,6 +65,7 @@ void loop() {
 }
 
 void update_acc_jerk_buf(float accX, float accY, float accZ){
+  //最新の加速度情報を受け，加速度，ジャークのバッファを更新する
   accX_buf[buf_top] = accX;
   accY_buf[buf_top] = accY;
   accZ_buf[buf_top] = accZ;
@@ -85,6 +88,7 @@ void update_acc_jerk_buf(float accX, float accY, float accZ){
   Serial.print(",");
   Serial.print(jerkZ_buf[buf_top]);
 
+  //循環バッファのインデックスを一つ進める
   buf_top++;
   buf_top = buf_top%buf_length;
 }
@@ -92,7 +96,8 @@ void update_acc_jerk_buf(float accX, float accY, float accZ){
 void drawing_task(void* arg){
   while(1){
     if(!is_calibrationing){
-      //描画 10Hz(100ms)
+      //キャリブレーション時以外の平常時の描画を
+      //本drawing_task()において10Hz(100ms)で行う
       draw_start_time = millis();
       int loop_cycle = 100;
 
@@ -104,7 +109,7 @@ void drawing_task(void* arg){
 
       unsigned long process_time = millis() - draw_start_time; //[ms]
       if(loop_cycle-process_time >= 0){
-        delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにloopを動作させる
+        delay(loop_cycle-process_time); //処理時間を差し引いて，100ms(10Hz)置きにwhileを動作させる
       }
     }
   }
@@ -132,7 +137,7 @@ void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
 
   //オリジナル矢印画像(→x,↓y, 矢印の根本が(0,0)，先端が(0,1))
   //→加速度に応じて回転＆拡大縮小(→x方向に-accX，↓y方向に-accZ)
-  //→ホモグラフィ変換で，奥行きのある台形にする(矢印が正方形に描かれているとして，高さを半分，上辺の横幅を半分にする)
+  //→奥行きのある形にする(画面中心を水平線，画面下1/4と画面最下端をそれぞれ45度，90度見下ろした時の地面位置とする)
   //→ピクセル座標に変換(例：中心座標[0,0]を[160, 120]に持っていく)
   float pi = 3.2415926535;
   for(int i=0; i<sizeof(arrow_ox)/sizeof(arrow_ox[0]); i++){
@@ -141,9 +146,9 @@ void draw_acc_arrow(float acc_x, float acc_y, float acc_z){
     float scale = sqrt(accZ*accZ + accX*accX) / g_std_size;
     arrow_rx[i] = scale*(cos(theta)*arrow_ox[i] - sin(theta)*arrow_oy[i]);
     arrow_ry[i] = scale*(sin(theta)*arrow_ox[i] + cos(theta)*arrow_oy[i]);
-    //台形変換
+    //奥行きのある形にする
     arrow_hy[i] = 0.5*(1-atan(1-arrow_ry[i])/(pi/4)) + 0.5; //画面中央が水平線になるように
-    arrow_hx[i] = arrow_rx[i]*arrow_hy[i];//0.5*arrow_rx[i]*arrow_ry[i] + 0.5*arrow_rx[i] - 0.25*arrow_ry[i] + 0.25;
+    arrow_hx[i] = arrow_rx[i]*arrow_hy[i]; //奥に行くほど横幅が小さく見えるように
     //画面サイズに合わせる
     arrow_px[i] = (int)(arrow_hx[i]*SCR_H/2 + SCR_W/2);
     arrow_py[i] = (int)(arrow_hy[i]*SCR_H/2 + SCR_H/2);
@@ -159,6 +164,7 @@ void draw_confort_face(float confort_degree){
     // 快適度(不快度)に応じて表情を描画する
     M5.Lcd.setCursor(10,10);
     if(confort_degree<1.0){
+      //happy face
       M5.Lcd.fillCircle(160,60,50,YELLOW); //face
       M5.Lcd.drawCircle(160-20,60,10,BLACK); //eye
       M5.Lcd.drawCircle(160+20,60,10,BLACK); //eye
@@ -167,6 +173,7 @@ void draw_confort_face(float confort_degree){
       return;
     }
     if(confort_degree<2.0){
+      //smile face
       M5.Lcd.fillCircle(160,60,50,YELLOW); //face
       M5.Lcd.fillRect(160-20-3,60-9,6,18,BLACK); //eye
       M5.Lcd.fillRect(160+20-3,60-9,6,18,BLACK); //eye
@@ -175,6 +182,7 @@ void draw_confort_face(float confort_degree){
       return;
     }
     if(confort_degree<4.0){
+      //pien face
       M5.Lcd.fillCircle(160,60,50,CYAN); //face
       M5.Lcd.fillCircle(160-20,60+1,15+1,WHITE); //pien eye
       M5.Lcd.fillCircle(160-20,60,15,BLACK);
@@ -192,6 +200,7 @@ void draw_confort_face(float confort_degree){
       M5.Lcd.drawLine(160+5,60+30,160,60+30-2,BLACK); //mouse
       return;
     }
+    //gero face
     M5.Lcd.fillCircle(160,60,50,PURPLE); //face
     M5.Lcd.drawLine(160-30,60-6,160-10,60,BLACK); //eye
     M5.Lcd.drawLine(160-30,60+6,160-10,60,BLACK);
@@ -203,14 +212,14 @@ void draw_confort_face(float confort_degree){
 }
 
 float calc_disconfort_degree(){
-  // 快適度(不快度)を加速度に基づいて算出する
+  // 快適度(不快度)を加速度，ジャークの履歴に基づいて算出する
   float jerk_sq_mean = 0.0;
   for(int i; i<buf_length; i++){
     jerk_sq_mean += (jerkX_buf[i]*jerkX_buf[i] + jerkZ_buf[i]*jerkZ_buf[i])/(float)buf_length;
   }
   Serial.print(",");
   Serial.print(jerk_sq_mean);
-  //jerkの大きさの2乗平均を不快度の指標として用いる
+  //jerkの大きさの2乗平均(実効値)を不快度の指標として用いる
   float disconfort_degree = 0.05*jerk_sq_mean; //係数は要調節
   Serial.print(",");
   Serial.println(disconfort_degree);
@@ -221,13 +230,10 @@ float calc_jerk(float* acc_buf){
   //加速度の変化を二次式で近似することによる，ノイズに強いjerk計算
   //参考：https://www.jstage.jst.go.jp/article/jje1965/36/4/36_4_191/_pdf/-char/ja
   
-  //BLA::Matrix<3,3> A;
-  //BLA::Matrix<3,1> b;
-
   //をやる前にまずは単純な微分値で実装
   //1ステップだとノイズの影響が大きいので，
   //100ms(10サンプル)(10Hz)間の変化量でjerkを計算し，平均化する
-  float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length])*9.8/0.1; //[G]→[m/s^3]
+  float jerk = (acc_buf[buf_top]-acc_buf[(buf_top+buf_length-10)%buf_length])*9.8/0.1; //acc[G]→jerk[m/s^3]
   return jerk;
 }
 
@@ -240,6 +246,7 @@ void calibration(){
   M5.Lcd.setCursor(20, 20); //文字表示の左上位置を設定
   M5.Lcd.setTextColor(WHITE); //文字色を設定（文字背景色は透明）
   M5.Lcd.println("Calibration now.\n\nPlease don't move me.");
+  //キャリブレーション開始までの準備時間
   delay(2000);
 
   accX_bias = 0;
@@ -254,9 +261,12 @@ void calibration(){
       accZ_bias += accZ;
       delay(10);
     }
+    //キャリブレーションが進行していることを示すため，1秒に1回ドットを表示する
     M5.Lcd.fillCircle((int)(SCR_W/2)+i*40,(int)(SCR_H/2),10,WHITE);
   }
+  //5個目のドットを見せるための時間
   delay(500);
+  
   accX_bias /= 500;
   accY_bias /= 500;
   accZ_bias /= 500;
