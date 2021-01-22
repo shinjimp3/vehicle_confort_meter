@@ -10,7 +10,7 @@ float accX_bias, accY_bias, accZ_bias;
 bool is_calibrationing;
 float jerkX, jerkY, jerkZ;
 float confort_degree = 0.0;
-float cutoff_pref = 8.0; //[Hz]
+float cutoff_pref = 4.0; //[Hz]
 const int buf_length = 300; //100Hzで3秒分
 float accX_buf[buf_length], accY_buf[buf_length], accZ_buf[buf_length]; //todo: バッファに頼らない処理にする
 float jerkX_buf[buf_length], jerkY_buf[buf_length], jerkZ_buf[buf_length];
@@ -174,7 +174,7 @@ void draw_confort_face(float confort_degree){
       M5.Lcd.fillRect(160-10,60,22,25,YELLOW); //face
       return;
     }
-    if(confort_degree<3.0){
+    if(confort_degree<4.0){
       M5.Lcd.fillCircle(160,60,50,CYAN); //face
       M5.Lcd.fillCircle(160-20,60+1,15+1,WHITE); //pien eye
       M5.Lcd.fillCircle(160-20,60,15,BLACK);
@@ -211,7 +211,7 @@ float calc_disconfort_degree(){
   Serial.print(",");
   Serial.print(jerk_sq_mean);
   //jerkの大きさの2乗平均を不快度の指標として用いる
-  float disconfort_degree = 0.0016*jerk_sq_mean; //係数は要調節
+  float disconfort_degree = 0.05*jerk_sq_mean; //係数は要調節
   Serial.print(",");
   Serial.println(disconfort_degree);
   return disconfort_degree;
